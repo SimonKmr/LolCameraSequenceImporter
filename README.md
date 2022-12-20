@@ -14,3 +14,7 @@ This should allow you to record sequences, skip motion tracking and get right to
 - The normal camera gets automatically adjusted to 40° Field of View. This is equal to the default lol camera, if you change the focal length, this is not taken into account and your motion tracking could be of.
 
 I still hope this program is useful and helps you to cut time motion tracking
+
+## Installation
+
+tbd
