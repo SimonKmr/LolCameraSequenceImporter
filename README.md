@@ -18,3 +18,7 @@ I still hope this program is useful and helps you to cut time motion tracking
 ## Installation
 
 tbd
+
+## How to use
+
+tbd
