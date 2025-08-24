@@ -2,7 +2,7 @@ bl_info = {
     "name": "lol-Camera Importer",
     "author": "SimonKmr",
     "version": (1, 0),
-    "blender": (2, 80, 0),
+    "blender": (4, 5, 0),
     "location": "",
     "description": "Uses a json created by CreatorSuite or the LolReplayApiSequence to create a camera with matching movement",
     "warning": "",
@@ -13,88 +13,112 @@ bl_info = {
 }
 
 import bpy
-from pathlib import Path
+import logging
 import json
 import math
+import requests
+from pathlib import Path
 from bpy.props import StringProperty, BoolProperty, EnumProperty
 from bpy.utils import register_class, unregister_class
 from bpy_extras.io_utils import ImportHelper
+from bpy.props import *
 
-def get_time_scale_factor(j):
-    fss = bpy.context.scene.frame_start
-    fse = bpy.context.scene.frame_end
-    fsd = fse - fss
-
-    te = 86400.0
-    tl = 0.0
-
-    for i in j["cameraPosition"]:
-        if i["time"] > tl:
-            tl = i["time"]
-            
-    for i in j["cameraPosition"]:
-        if i["time"] < te:
-            te = i["time"]
-         
-    td = tl - te
-    return [fsd / td,te]
-
-def create_sequence(j):
+def create_camera(lol_camera):
     #adjust timeframe to blender file
-    sa = 0.01
-    tsfr = get_time_scale_factor(j)
-    tmf = tsfr[0]
-    te = tsfr[1]
+    scale = 0.01
+    duration_scale = 1
     
     #create camera
     bpy.ops.object.camera_add(enter_editmode=False, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1))
     camera = bpy.context.active_object
     camera.data.angle = 0.698132
-
+    
     #import camera location
-    pc = len(j["cameraPosition"])
-    for i in range(pc):
-        camera.location = [j["cameraPosition"][i]["value"]["x"] * sa,
-        j["cameraPosition"][i]["value"]["z"] * sa,
-        j["cameraPosition"][i]["value"]["y"] * sa]
+    positions = len(lol_camera["cameraPosition"])
+    for pos in range(positions):
+        location = [lol_camera["cameraPosition"][pos]["value"]["x"] * scale,
+                    lol_camera["cameraPosition"][pos]["value"]["z"] * scale,
+                    lol_camera["cameraPosition"][pos]["value"]["y"] * scale]
         
-        t = j["cameraPosition"][i]["time"]-te
-        f = t*tmf+1
-        camera.keyframe_insert(data_path="location",index = 1, frame=f)
+        
+        camera.location = location
+        
+        
+        offset = get_time_offset(lol_camera["cameraPosition"])
+        time = lol_camera["cameraPosition"][pos]["time"] - offset
+        frame = time * bpy.context.scene.render.fps * duration_scale
+        
+        camera.keyframe_insert(data_path="location",index = 0, frame=frame)
+        camera.keyframe_insert(data_path="location",index = 1, frame=frame)
+        camera.keyframe_insert(data_path="location",index = 2, frame=frame)
 
     #import camera rotation
-    rc= len(j["cameraRotation"])
-    for i in range(rc):   
-        camera.rotation_euler = [math.radians(-j["cameraRotation"][i]["value"]["y"]+90),
-        math.radians(j["cameraRotation"][i]["value"]["z"]),
-        math.radians(-j["cameraRotation"][i]["value"]["x"])]
+    rotations = len(lol_camera["cameraRotation"])
+    for rot in range(rotations):
+        rotation = [math.radians(-lol_camera["cameraRotation"][rot]["value"]["y"]+90),
+                    math.radians(lol_camera["cameraRotation"][rot]["value"]["z"]),
+                    math.radians(-lol_camera["cameraRotation"][rot]["value"]["x"])]
         
-        t = j["cameraRotation"][i]["time"]-te
-        f = t*tmf+1
-        camera.keyframe_insert(data_path="rotation_euler", frame=f)
+        camera.rotation_euler = rotation
+        
+        time = lol_camera["cameraRotation"][rot]["time"] - offset
+        frame = time * bpy.context.scene.render.fps * duration_scale
+          
+        camera.keyframe_insert(data_path="rotation_euler", frame=frame)
         
         
     return {'FINISHED'}
 
+def get_time_offset(keyframes):
+    n = len(keyframes)
+    
+    result = -1
+    smallest_offset = float("inf")
+    
+    for k in range(n):
+        if keyframes[k]["time"] < smallest_offset:
+            smallest_offset = keyframes[k]["time"]
 
-class ButtonOperator(bpy.types.Operator):
+    return smallest_offset
+
+class ImportFileButtonOperator(bpy.types.Operator):
     bl_idname="object.lolcameraimportbutton"
     bl_label="Import lolCameraMovement"
-    
-    
-    
-
-
-    
     
     def execute(self, context):
         #open_file_menu
         bpy.ops.lol_camera.sequence_importer('INVOKE_DEFAULT')
         return {'FINISHED'}
 
+class ImportClientButtonOperator(bpy.types.Operator):
+    bl_idname="object.lolcameraimportclientbutton"
+    bl_label="Import lolCameraMovement"
+    
+    def execute(self, context):
+        #request sequence data from League API
+        #https://127.0.0.1:2999/replay/sequence
+        response = requests.get("https://127.0.0.1:2999/replay/sequence", verify=False)
+        sequence = json.loads(response.text)
+        create_camera(sequence)
+        return {'FINISHED'}    
 
-
-
+class ImportSequence(bpy.types.Operator, ImportHelper):
+    bl_idname = "lol_camera.sequence_importer"
+    bl_label = "Import Sequence" 
+    
+    filename_ext = ".json"
+    
+    filter_glob: StringProperty(
+        default="*.json",
+        options={'HIDDEN'},
+        maxlen=255,  # Max internal buffer length, longer would be clamped.
+    )
+    
+    def execute(self, context):
+        with open(self.filepath) as file:
+            sequence = json.load(file)
+            create_camera(sequence)
+        return {'FINISHED'}
 
 
 class LolCameraImporterPanel(bpy.types.Panel):
@@ -108,34 +132,17 @@ class LolCameraImporterPanel(bpy.types.Panel):
         layout = self.layout
         obj = context.object
         row = layout.row()
-        row.operator(ButtonOperator.bl_idname,text="Import", icon='WORLD_DATA')
+        row.operator(ImportFileButtonOperator.bl_idname,text="Import File")
+        row = layout.row()
+        row.operator(ImportClientButtonOperator.bl_idname,text="Import Client")
+        
+    
 
-
-def read_sequence(context, filepath):
-    with open(filepath) as f:
-        return json.load(f)
-    
-class ImportSequence(bpy.types.Operator, ImportHelper):
-    bl_idname = "lol_camera.sequence_importer"
-    bl_label = "Import Sequence" 
-    
-    filename_ext = ".json"
-    
-    filter_glob: StringProperty(
-        default="*.json",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
-    
-    
-    def execute(self, context):
-        s = read_sequence(context, self.filepath)
-        create_sequence(s)
-        return {'FINISHED'}
 
 _classes = [
     LolCameraImporterPanel,
-    ButtonOperator,
+    ImportFileButtonOperator,
+    ImportClientButtonOperator,
     ImportSequence
 ]
 
