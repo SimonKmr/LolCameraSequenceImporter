@@ -26,51 +26,54 @@ from bpy.props import *
 def create_camera(lol_camera, settings):
     #adjust timeframe to blender file
     scale = settings.scale
-    duration_scale = settings.speed
+    duration_scale = 1 / settings.speed
     
     #create camera
     bpy.ops.object.camera_add(enter_editmode=False, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1))
     camera = bpy.context.active_object
     camera.data.angle = 0.698132
     
+    #get offset to set first frame at 0
+    offset = get_time_offset(lol_camera["cameraPosition"])
+    
     #import camera location
-    positions = len(lol_camera["cameraPosition"])
-    for pos in range(positions):
-        location = [lol_camera["cameraPosition"][pos]["value"]["x"] * scale,
-                    lol_camera["cameraPosition"][pos]["value"]["z"] * scale,
-                    lol_camera["cameraPosition"][pos]["value"]["y"] * scale]
-        
-        
-        camera.location = location
-        
-        
-        offset = get_time_offset(lol_camera["cameraPosition"])
-        time = lol_camera["cameraPosition"][pos]["time"] - offset
-        frame = time * bpy.context.scene.render.fps * duration_scale
-        
-        camera.keyframe_insert(data_path="location",index = 0, frame=frame)
-        camera.keyframe_insert(data_path="location",index = 1, frame=frame)
-        camera.keyframe_insert(data_path="location",index = 2, frame=frame)
+    if settings.use_position:
+        positions = len(lol_camera["cameraPosition"])
+        for pos in range(positions):
+            location = [lol_camera["cameraPosition"][pos]["value"]["x"] * scale,
+                        lol_camera["cameraPosition"][pos]["value"]["z"] * scale,
+                        lol_camera["cameraPosition"][pos]["value"]["y"] * scale]
+            
+            
+            camera.location = location
+            
+            time = lol_camera["cameraPosition"][pos]["time"] - offset
+            frame = time * bpy.context.scene.render.fps * duration_scale
+            
+            camera.keyframe_insert(data_path="location",index = 0, frame=frame)
+            camera.keyframe_insert(data_path="location",index = 1, frame=frame)
+            camera.keyframe_insert(data_path="location",index = 2, frame=frame)
 
     #import camera rotation
-    rotations = len(lol_camera["cameraRotation"])
-    for rot in range(rotations):
-        rotation = [math.radians(-lol_camera["cameraRotation"][rot]["value"]["y"]+90),
-                    math.radians(lol_camera["cameraRotation"][rot]["value"]["z"]),
-                    math.radians(-lol_camera["cameraRotation"][rot]["value"]["x"])]
-        
-        camera.rotation_euler = rotation
-        
-        time = lol_camera["cameraRotation"][rot]["time"] - offset
-        frame = time * bpy.context.scene.render.fps * duration_scale
-          
-        camera.keyframe_insert(data_path="rotation_euler", frame=frame)
-        
-    
+    if settings.use_rotation:
+        rotations = len(lol_camera["cameraRotation"])
+        for rot in range(rotations):
+            rotation = [math.radians(-lol_camera["cameraRotation"][rot]["value"]["y"]+90),
+                        math.radians(lol_camera["cameraRotation"][rot]["value"]["z"]),
+                        math.radians(-lol_camera["cameraRotation"][rot]["value"]["x"])]
+            
+            camera.rotation_euler = rotation
+            
+            time = lol_camera["cameraRotation"][rot]["time"] - offset
+            frame = time * bpy.context.scene.render.fps * duration_scale
+              
+            camera.keyframe_insert(data_path="rotation_euler", frame=frame)
+            
     #import focal length
-    focal_lengths = len(lol_camera["fieldOfView"])
-    for fov in range(rotations):
-        camera.data.angle = 0.698132
+    if settings.use_fov:
+        focal_lengths = len(lol_camera["fieldOfView"])
+        for fov in range(rotations):
+            camera.data.angle = 0.698132
     
     return {'FINISHED'}
 
@@ -143,9 +146,9 @@ class LolCameraImporterPanel(bpy.types.Panel):
         row = layout.row()
         
         row = layout.label(text="Selection")
-        layout.row().prop(context.scene.camera_props, 'is_importing_position')
-        layout.row().prop(context.scene.camera_props, 'is_importing_rotation')
-        layout.row().prop(context.scene.camera_props, 'is_importing_fov')
+        layout.row().prop(context.scene.camera_props, 'use_position')
+        layout.row().prop(context.scene.camera_props, 'use_rotation')
+        layout.row().prop(context.scene.camera_props, 'use_fov')
         row = layout.row()
         
         row = layout.label(text="Import Camera by")
@@ -157,9 +160,9 @@ class CameraPropertyGroup(bpy.types.PropertyGroup):
     scale: bpy.props.FloatProperty(name="Scale", soft_min=0.001, soft_max=1, default=0.01)
     speed: bpy.props.FloatProperty(name="Speed", soft_min=0.25, soft_max=4, default = 1)
     
-    is_importing_position: bpy.props.BoolProperty(name="Position",default=True)
-    is_importing_rotation: bpy.props.BoolProperty(name="Rotation",default=True)
-    is_importing_fov: bpy.props.BoolProperty(name="FOV",default=True)
+    use_position: bpy.props.BoolProperty(name="Position",default=True)
+    use_rotation: bpy.props.BoolProperty(name="Rotation",default=True)
+    use_fov: bpy.props.BoolProperty(name="FOV",default=True)
 
 _classes = [
     LolCameraImporterPanel,
