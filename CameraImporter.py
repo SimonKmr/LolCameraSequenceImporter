@@ -23,10 +23,10 @@ from bpy.utils import register_class, unregister_class
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import *
 
-def create_camera(lol_camera):
+def create_camera(lol_camera, settings):
     #adjust timeframe to blender file
-    scale = 0.01
-    duration_scale = 1
+    scale = settings.scale
+    duration_scale = settings.speed
     
     #create camera
     bpy.ops.object.camera_add(enter_editmode=False, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1))
@@ -104,7 +104,7 @@ class Import_Client_Button_Operator(bpy.types.Operator):
         #https://127.0.0.1:2999/replay/sequence
         response = requests.get("https://127.0.0.1:2999/replay/sequence", verify=False)
         sequence = json.loads(response.text)
-        create_camera(sequence)
+        create_camera(sequence,context.scene.camera_props)
         return {'FINISHED'}    
 
 class ImportSequence(bpy.types.Operator, ImportHelper):
@@ -122,9 +122,8 @@ class ImportSequence(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         with open(self.filepath) as file:
             sequence = json.load(file)
-            create_camera(sequence)
+            create_camera(sequence,context.scene.camera_props)
         return {'FINISHED'}
-
 
 class LolCameraImporterPanel(bpy.types.Panel):
     bl_label = "League Camera"
@@ -136,24 +135,31 @@ class LolCameraImporterPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         obj = context.object
-        row = layout.label(text="Settings")
+        layout.label(text="Settings")
         #row = layout.row()
         #row.prop(context.scene.camera_props, 'target')
+        layout.row().prop(context.scene.camera_props, 'scale')
+        layout.row().prop(context.scene.camera_props, 'speed')
         row = layout.row()
-        row.prop(context.scene.camera_props, 'scale')
-        row = layout.row()
-        row.prop(context.scene.camera_props, 'speed')
-        row = layout.label(text="Import Camera by")
-        row = layout.row()
-        row.operator(Import_File_Button_Operator.bl_idname,text="File")
-        row = layout.row()
-        row.operator(Import_Client_Button_Operator.bl_idname,text="Client")
         
-
+        row = layout.label(text="Selection")
+        layout.row().prop(context.scene.camera_props, 'is_importing_position')
+        layout.row().prop(context.scene.camera_props, 'is_importing_rotation')
+        layout.row().prop(context.scene.camera_props, 'is_importing_fov')
+        row = layout.row()
+        
+        row = layout.label(text="Import Camera by")
+        layout.row().operator(Import_Client_Button_Operator.bl_idname,text="Client")
+        layout.row().operator(Import_File_Button_Operator.bl_idname,text="File")
+        
 class CameraPropertyGroup(bpy.types.PropertyGroup):
     #target: bpy.props.PointerProperty(type='MaterialSettings',name="Camera")
     scale: bpy.props.FloatProperty(name="Scale", soft_min=0.001, soft_max=1, default=0.01)
     speed: bpy.props.FloatProperty(name="Speed", soft_min=0.25, soft_max=4, default = 1)
+    
+    is_importing_position: bpy.props.BoolProperty(name="Position",default=True)
+    is_importing_rotation: bpy.props.BoolProperty(name="Rotation",default=True)
+    is_importing_fov: bpy.props.BoolProperty(name="FOV",default=True)
 
 _classes = [
     LolCameraImporterPanel,
