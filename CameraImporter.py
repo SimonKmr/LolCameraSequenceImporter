@@ -1,10 +1,10 @@
 bl_info = {
-    "name": "lol-Camera Importer",
+    "name": "League Camera Importer",
     "author": "SimonKmr",
     "version": (1, 0),
     "blender": (4, 5, 0),
     "location": "",
-    "description": "Uses a json created by CreatorSuite or the LolReplayApiSequence to create a camera with matching movement",
+    "description": "Get the camera data from League of Legends and create a camera in Blender. Also works with json files from CreatorSuite / LolNam-Editor.",
     "warning": "",
     "support": "",
     "wiki_url": "",
@@ -66,7 +66,12 @@ def create_camera(lol_camera):
           
         camera.keyframe_insert(data_path="rotation_euler", frame=frame)
         
-        
+    
+    #import focal length
+    focal_lengths = len(lol_camera["fieldOfView"])
+    for fov in range(rotations):
+        camera.data.angle = 0.698132
+    
     return {'FINISHED'}
 
 def get_time_offset(keyframes):
@@ -81,7 +86,7 @@ def get_time_offset(keyframes):
 
     return smallest_offset
 
-class ImportFileButtonOperator(bpy.types.Operator):
+class Import_File_Button_Operator(bpy.types.Operator):
     bl_idname="object.lolcameraimportbutton"
     bl_label="Import lolCameraMovement"
     
@@ -90,7 +95,7 @@ class ImportFileButtonOperator(bpy.types.Operator):
         bpy.ops.lol_camera.sequence_importer('INVOKE_DEFAULT')
         return {'FINISHED'}
 
-class ImportClientButtonOperator(bpy.types.Operator):
+class Import_Client_Button_Operator(bpy.types.Operator):
     bl_idname="object.lolcameraimportclientbutton"
     bl_label="Import lolCameraMovement"
     
@@ -122,31 +127,46 @@ class ImportSequence(bpy.types.Operator, ImportHelper):
 
 
 class LolCameraImporterPanel(bpy.types.Panel):
-    bl_label = "lol-Camera"
+    bl_label = "League Camera"
     bl_idname = "lolcameraimportpanel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "lol-Camera"
+    bl_category = "League Camera"
 
     def draw(self, context):
         layout = self.layout
         obj = context.object
+        row = layout.label(text="Settings")
+        #row = layout.row()
+        #row.prop(context.scene.camera_props, 'target')
         row = layout.row()
-        row.operator(ImportFileButtonOperator.bl_idname,text="Import File")
+        row.prop(context.scene.camera_props, 'scale')
         row = layout.row()
-        row.operator(ImportClientButtonOperator.bl_idname,text="Import Client")
+        row.prop(context.scene.camera_props, 'speed')
+        row = layout.label(text="Import Camera by")
+        row = layout.row()
+        row.operator(Import_File_Button_Operator.bl_idname,text="File")
+        row = layout.row()
+        row.operator(Import_Client_Button_Operator.bl_idname,text="Client")
         
-    
 
+class CameraPropertyGroup(bpy.types.PropertyGroup):
+    #target: bpy.props.PointerProperty(type='MaterialSettings',name="Camera")
+    scale: bpy.props.FloatProperty(name="Scale", soft_min=0.001, soft_max=1, default=0.01)
+    speed: bpy.props.FloatProperty(name="Speed", soft_min=0.25, soft_max=4, default = 1)
 
 _classes = [
     LolCameraImporterPanel,
-    ImportFileButtonOperator,
-    ImportClientButtonOperator,
-    ImportSequence
+    Import_File_Button_Operator,
+    Import_Client_Button_Operator,
+    ImportSequence,
 ]
 
 def register():
+    
+    bpy.utils.register_class(CameraPropertyGroup)
+    bpy.types.Scene.camera_props = bpy.props.PointerProperty(type=CameraPropertyGroup)
+    
     for cls in _classes:
         register_class(cls)
     

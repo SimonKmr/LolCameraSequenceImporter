@@ -7,17 +7,15 @@ This should allow you to record sequences, skip motion tracking and get right to
 ![grafik](https://user-images.githubusercontent.com/41740705/208783617-1d4d9136-8873-4972-8645-d84f74c12d7a.png)
 
 ## Known Issues 
-- The keyframes always match from the first to the last keyframe the start and end of the rendering region. You need to adjust it to the length of the clip or sequence. 
-- The keyframes are not put to linear, this part of the Blender API is not well done
-  - This means, select all keyframes and change the interpolation to linear
-- The length of the timespan is calculated by the location/position keyframes, this means if you have a clip that has rotation keyframes after its location keyframes, the timing should be off.
+- The keyframes are not put to linear instead smoothed by a bezir curve
+  - This means, select all keyframes and change the interpolation to linear to fix.
+- I don't know how the interpolation works in the programs, for the most accurate results use the client.
+- The Start of the sequence is determined by the first Position Keyframe. If you got Keyframes before that, they are before Frame one.
 - The normal camera gets automatically adjusted to 40° Field of View. This is equal to the default lol camera, if you change the focal length, this is not taken into account and your motion tracking could be of.
-
-I still hope this program is useful and helps you to cut time motion tracking
 
 ## Installation
 
-tbd
+[YouTube Tutorial](https://www.youtube.com/watch?v=OCTvyo2FVFw)
 
 ## How to use
 
